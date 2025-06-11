@@ -1,0 +1,31 @@
+/* 
+  Localizable.strings
+  MyApp
+
+  Created by Developer on 2024/01/01.
+*/
+
+/* Common */
+"app_name" = "My App";
+"welcome_message" = "Welcome to our application!";
+"loading" = "Loading...";
+"error_generic" = "An error occurred";
+"retry" = "Try again";
+
+/* Authentication */
+"login_button" = "Log In";
+"signup_button" = "Sign Up";
+"logout_button" = "Log Out";
+"email_placeholder" = "Email";
+"password_placeholder" = "Password";
+"forgot_password_link" = "Forgot your password?";
+
+/* Validation Messages */
+"validation_required" = "This field is required";
+"validation_email_invalid" = "Please enter a valid email address";
+"validation_password_short" = "Password must be at least 8 characters";
+
+/* Success Messages */
+"login_success" = "Successfully logged in!";
+"logout_success" = "You have been logged out";
+"account_created" = "Your account has been created"; 

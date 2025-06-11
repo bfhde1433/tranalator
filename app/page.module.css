@@ -1,0 +1,626 @@
+.main {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  min-height: 100vh;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 3rem;
+  color: #333;
+}
+
+.section {
+  margin-bottom: 1.5rem;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.input,
+.select,
+.textarea {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+  background-color: #fff;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.fileInput {
+  padding: 0.5rem;
+  cursor: pointer;
+}
+
+.textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.error {
+  background-color: #fee;
+  color: #c33;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.button,
+.buttonSecondary {
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.button {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.button:hover:not(:disabled) {
+  background-color: #45a049;
+}
+
+.button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.buttonSecondary {
+  background-color: #2196F3;
+  color: white;
+}
+
+.buttonSecondary:hover {
+  background-color: #1976D2;
+}
+
+.preview {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #f5f5f5;
+  border-radius: 0.5rem;
+}
+
+.preview h3 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.previewContent {
+  background-color: #fff;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  font-family: monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.auditSection {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+  border-radius: 0.5rem;
+  border: 1px solid #e0e0e0;
+}
+
+.auditSection h3 {
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.25rem;
+}
+
+.auditStats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.statItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 1rem;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border: 1px solid #e0e0e0;
+}
+
+.statLabel {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.statValue {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.statValue.success {
+  color: #4CAF50;
+}
+
+.statValue.warning {
+  color: #FF9800;
+}
+
+.statValue.error {
+  color: #f44336;
+}
+
+.auditDetails {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border: 1px solid #e0e0e0;
+}
+
+.auditDetails h4 {
+  margin-bottom: 0.75rem;
+  color: #555;
+  font-size: 1rem;
+}
+
+.keyList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.keyItem {
+  padding: 0.5rem;
+  border-bottom: 1px solid #f0f0f0;
+  font-family: monospace;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.keyItem:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 768px) {
+  .main {
+    padding: 1rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
+
+  .button,
+  .buttonSecondary {
+    width: 100%;
+  }
+
+  .auditStats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Language selection styles */
+.languageGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 0.5rem;
+  background-color: #f9f9f9;
+}
+
+.languageTagButton {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 0.75rem;
+  background-color: #fff;
+  border: 1px solid #ddd;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  width: 100%;
+}
+
+.languageTagButton:hover {
+  background-color: #f5f5f5;
+  border-color: #2196F3;
+}
+
+.languageTagButton.selected {
+  background-color: #e3f2fd;
+  border-color: #2196F3;
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.2);
+}
+
+.languageCode {
+  font-weight: 600;
+  color: #1976D2;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.languageName {
+  color: #333;
+  font-size: 0.875rem;
+  margin-bottom: 0.125rem;
+}
+
+.languageNative {
+  color: #666;
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.selectedLanguages {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background-color: #f5f5f5;
+  border-radius: 0.5rem;
+}
+
+.selectedLanguages h4 {
+  margin: 0 0 0.75rem 0;
+  color: #333;
+  font-size: 1rem;
+}
+
+.languageInput {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.addButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.addButton:hover:not(:disabled) {
+  background-color: #1976D2;
+}
+
+.addButton:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.languageList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.languageTag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #e3f2fd;
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  color: #1976D2;
+}
+
+.removeButton {
+  background: none;
+  border: none;
+  color: #1976D2;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+
+.removeButton:hover {
+  background-color: rgba(25, 118, 210, 0.1);
+}
+
+/* Translations container */
+.translationsContainer {
+  margin-top: 2rem;
+}
+
+.translationsContainer h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.translationSection {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background-color: #f9f9f9;
+  border-radius: 0.5rem;
+  border: 1px solid #e0e0e0;
+}
+
+.translationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.translationHeader h3 {
+  margin: 0;
+  color: #333;
+  font-size: 1.25rem;
+}
+
+.translationActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.copyButton,
+.downloadButton {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.copyButton {
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
+.copyButton:hover {
+  background-color: #e0e0e0;
+}
+
+.downloadButton {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.downloadButton:hover {
+  background-color: #45a049;
+}
+
+.miniAudit {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+}
+
+.miniAuditItem {
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  background-color: #f0f0f0;
+}
+
+.miniAuditItem.success {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.miniAuditItem.warning {
+  background-color: #fff3e0;
+  color: #e65100;
+}
+
+.miniAuditItem.error {
+  background-color: #ffebee;
+  color: #c62828;
+}
+
+.miniAuditItem.critical {
+  background-color: #ff5252;
+  color: white;
+  font-weight: 600;
+}
+
+.translationContent {
+  background-color: #fff;
+  padding: 1rem;
+  border-radius: 0.25rem;
+  border: 1px solid #e0e0e0;
+  margin-bottom: 1rem;
+}
+
+.translationContent pre {
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.875rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+details.auditDetails {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border: 1px solid #e0e0e0;
+}
+
+details.auditDetails summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #555;
+  margin-bottom: 0.5rem;
+}
+
+details.auditDetails summary:hover {
+  color: #333;
+}
+
+@media (max-width: 768px) {
+  .languageInput {
+    flex-direction: column;
+  }
+
+  .languageGrid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    max-height: 300px;
+  }
+
+  .languageTagButton {
+    padding: 0.5rem;
+  }
+
+  .translationHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .translationActions {
+    width: 100%;
+  }
+
+  .copyButton,
+  .downloadButton {
+    flex: 1;
+  }
+}
+
+/* Concurrent control styles */
+.concurrentControl {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.rangeInput {
+  flex: 1;
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.rangeInput::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #2196F3;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.rangeInput::-webkit-slider-thumb:hover {
+  background: #1976D2;
+}
+
+.rangeInput::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #2196F3;
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s;
+}
+
+.rangeInput::-moz-range-thumb:hover {
+  background: #1976D2;
+}
+
+.rangeValue {
+  min-width: 2rem;
+  text-align: center;
+  font-weight: 600;
+  color: #2196F3;
+  font-size: 1.125rem;
+}
+
+.hint {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* Progress bar styles */
+.progressContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progressBar {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressFill {
+  height: 100%;
+  background-color: #4CAF50;
+  transition: width 0.3s ease;
+  border-radius: 4px;
+}
+
+.progressText {
+  font-size: 0.875rem;
+  color: #666;
+  text-align: center;
+} 

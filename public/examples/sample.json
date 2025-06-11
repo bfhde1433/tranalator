@@ -1,0 +1,34 @@
+{
+  "common": {
+    "welcome": "Welcome",
+    "hello": "Hello",
+    "goodbye": "Goodbye",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "signup": "Sign Up",
+    "forgotPassword": "Forgot Password?",
+    "resetPassword": "Reset Password",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password"
+  },
+  "messages": {
+    "welcome": "Welcome to our application!",
+    "loginSuccess": "You have successfully logged in.",
+    "logoutSuccess": "You have been logged out.",
+    "saveSuccess": "Your changes have been saved.",
+    "deleteConfirm": "Are you sure you want to delete this item?",
+    "errorGeneric": "Something went wrong. Please try again."
+  }
+} 
