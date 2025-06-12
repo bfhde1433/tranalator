@@ -468,6 +468,11 @@
   font-weight: 600;
 }
 
+.miniAuditItem.info {
+  background-color: #e3f2fd;
+  color: #1976D2;
+}
+
 .translationContent {
   background-color: #fff;
   padding: 1rem;
@@ -515,6 +520,31 @@ details.auditDetails summary:hover {
 
   .languageTagButton {
     padding: 0.5rem;
+  }
+
+  .dropZone {
+    padding: 1.5rem 1rem;
+  }
+
+  .dropZoneIcon {
+    font-size: 2rem;
+  }
+
+  .dropZoneText {
+    font-size: 1rem;
+  }
+
+  .dropZoneOr::before,
+  .dropZoneOr::after {
+    width: 30px;
+  }
+
+  .dropZoneOr::before {
+    left: -40px;
+  }
+
+  .dropZoneOr::after {
+    right: -40px;
   }
 
   .translationHeader {
@@ -623,4 +653,152 @@ details.auditDetails summary:hover {
   font-size: 0.875rem;
   color: #666;
   text-align: center;
+}
+
+/* Existing translations styles */
+.existingTranslationsInfo {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f0f8ff;
+  border-radius: 0.5rem;
+  border: 1px solid #b3d9ff;
+}
+
+.existingTranslationsInfo h4 {
+  margin: 0 0 0.75rem 0;
+  color: #1976D2;
+  font-size: 1rem;
+}
+
+.existingLanguagesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.existingLanguageTag {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: #e3f2fd;
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  color: #1976D2;
+  border: 1px solid #90caf9;
+}
+
+.clearButton {
+  padding: 0.5rem 1rem;
+  background-color: #ff5722;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s;
+}
+
+.clearButton:hover {
+  background-color: #e64a19;
+}
+
+.mergeIndicator {
+  font-size: 0.875rem;
+  color: #2196F3;
+  font-weight: normal;
+}
+
+/* Drag and drop zone styles */
+.dropZone {
+  border: 2px dashed #ddd;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  text-align: center;
+  background-color: #fafafa;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+.dropZone:hover {
+  border-color: #2196F3;
+  background-color: #f5f9ff;
+}
+
+.dropZone.dragOver {
+  border-color: #2196F3;
+  background-color: #e3f2fd;
+  transform: scale(1.02);
+}
+
+.dropZoneContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.dropZoneIcon {
+  font-size: 3rem;
+  opacity: 0.6;
+}
+
+.dropZoneText {
+  color: #333;
+  font-size: 1.125rem;
+  line-height: 1.5;
+}
+
+.dropZoneSubtext {
+  color: #666;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.dropZoneOr {
+  color: #999;
+  font-size: 0.875rem;
+  position: relative;
+  padding: 0 1rem;
+}
+
+.dropZoneOr::before,
+.dropZoneOr::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 50px;
+  height: 1px;
+  background-color: #ddd;
+}
+
+.dropZoneOr::before {
+  left: -60px;
+}
+
+.dropZoneOr::after {
+  right: -60px;
+}
+
+.browseButton {
+  padding: 0.75rem 1.5rem;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.browseButton:hover {
+  background-color: #1976D2;
+}
+
+#existing-translations-input {
+  display: none;
 } 

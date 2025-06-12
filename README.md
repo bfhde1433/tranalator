@@ -7,6 +7,7 @@ A Next.js application that uses Google's Gemini AI to translate localization fil
 - **Multiple File Format Support**: JSON, Android XML, Xcode strings, and plain text
 - **Language Tags Selection**: Choose from 70+ popular languages with an easy-to-use tag interface
 - **Parallel Translation**: Translate to multiple languages simultaneously with configurable concurrency
+- **Smart Merge Mode**: Upload existing translations and only translate missing keys
 - **Smart File Naming**: Downloads use language codes (e.g., `es.json`, `fr.json`) for easy integration
 - **Translation Audit**: Automatic validation of translated JSON files to ensure all keys are translated
 - **Multiple AI Models**: Support for various Gemini models including Flash, Pro, and custom models
@@ -39,24 +40,58 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Usage
 
+### Basic Translation
+
 1. **Enter your Gemini API Key**: Required for translation services
 2. **Select AI Model**: Choose from Gemini Flash (recommended), Pro, or enter a custom model
 3. **Set Concurrent Translations**: Adjust the slider (1-20) to control parallel processing
-   - Higher values = faster translation but may hit API rate limits
-   - Recommended: 5-10 for most systems, 10-15 for high-end systems like Ryzen 9
-4. **Choose Translation Mode**: 
-   - JSON for Next.js/React localization files
-   - XML for Android strings
-   - Xcode for iOS localization
-   - Text for direct text translation
-5. **Select Target Languages**: Click on language tags to select/deselect languages
-6. **Upload File or Enter Text**: Depending on your mode
+4. **Choose Translation Mode**: JSON, XML, Xcode, or Text
+5. **Upload Main File**: Your source localization file
+6. **Select Target Languages**: Click on language tags to select/deselect languages
 7. **Add Context** (optional): Describe your app for better translations
 8. **Click Translate**: The app will translate to all selected languages in parallel
 
+### Smart Merge Mode (Recommended Workflow)
+
+For the most efficient workflow when you have existing translations:
+
+1. **Upload Main File**: Your updated source file (e.g., `en.json`)
+2. **Upload Existing Translations**: 
+   - **Drag & Drop**: Simply drag your entire translations folder into the drop zone
+   - **Browse**: Click "Browse Files/Folder" to select multiple files or a folder
+   - **Auto-Detection**: The app automatically detects language codes from filenames
+   - **Bulk Upload**: Upload dozens of translation files at once
+3. **Auto-Selection**: Languages with existing translations are automatically selected
+4. **Smart Translation**: Only missing or untranslated keys are sent to the AI
+5. **Merged Results**: Get complete translation files with existing + new translations
+
+#### Drag & Drop Features:
+- **Folder Upload**: Drag your entire `/translations` or `/locales` folder
+- **Multi-File Upload**: Drag multiple individual files at once
+- **Smart Filtering**: Automatically ignores non-translation files
+- **Visual Feedback**: Clear drag-over indication and file count
+- **Error Handling**: Shows helpful messages for invalid files
+
+#### Benefits of Merge Mode:
+- **Faster**: Only translates what's needed
+- **Cost-Effective**: Fewer API calls = lower costs
+- **Preserves Quality**: Keeps your existing good translations
+- **Incremental Updates**: Perfect for adding new features to existing apps
+- **Bulk Processing**: Handle entire translation folders effortlessly
+
+### File Naming Convention
+
+The app automatically detects language codes from filenames:
+- `es.json`, `fr.json`, `de.json` → `es`, `fr`, `de`
+- `translated_es.xml`, `translated_fr.xml` → `es`, `fr`
+- `Localizable_es.strings` → `es`
+- `zh-TW.json`, `en-US.json` → `zh-TW`, `en-US` (supports region codes)
+
+Downloaded files use the same language code format for easy integration.
+
 ### Parallel Translation
 
-The app now supports parallel translation processing to significantly speed up multi-language translations:
+The app supports parallel translation processing to significantly speed up multi-language translations:
 
 - **Configurable Concurrency**: Set between 1-20 concurrent translations
 - **Batch Processing**: Languages are processed in batches to respect the concurrent limit
@@ -76,12 +111,6 @@ The app includes 70+ popular languages organized by region:
 
 Selected languages are saved automatically and restored on your next visit.
 
-### File Naming Convention
-
-Downloaded files use language codes for easy integration:
-- JSON files: `{languageCode}.json` (e.g., `es.json`, `fr.json`, `zh-TW.json`)
-- Other formats: `translated_{languageCode}.{extension}` (e.g., `translated_es.xml`)
-
 ## Translation Quality
 
 The app includes an audit system for JSON translations that checks:
@@ -89,6 +118,7 @@ The app includes an audit system for JSON translations that checks:
 - ✓ All values have been translated (not left in original language)
 - ⚠️ Potential untranslated strings (same as original)
 - ❌ Missing translations
+- 🔄 Merge status (when using existing translations)
 
 ## API Configuration
 
@@ -105,6 +135,34 @@ The app supports multiple Gemini models:
 - **For API stability**: Keep concurrent limit at 5-10
 - **For large files**: Consider splitting into smaller chunks
 - **For many languages**: The parallel processing will significantly reduce total time
+- **For existing projects**: Use merge mode to only translate new/missing keys
+
+## Workflow Examples
+
+### New Project
+1. Upload your source file (e.g., `en.json`)
+2. Select target languages
+3. Translate all languages from scratch
+
+### Existing Project with Updates
+1. Upload updated source file
+2. Upload existing translation files
+3. App automatically finds missing keys
+4. Only translates what's new/missing
+5. Download merged, complete files
+
+### Bulk Folder Upload (Fastest)
+1. Upload your updated source file (e.g., `en.json`)
+2. Drag your entire `/translations` folder into the drop zone
+3. App processes all files automatically (es.json, fr.json, de.json, etc.)
+4. Missing keys are identified across all languages
+5. Parallel translation of only missing keys
+6. Download updated complete translation files
+
+### Adding New Language
+1. Upload source file
+2. Select new language (existing translations optional)
+3. Get complete translation for new language
 
 ## Development
 
