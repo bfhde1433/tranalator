@@ -652,7 +652,7 @@ Make sure each translation sounds natural in its respective language.`;
               const langName = getLanguageName(langCode);
               const isPartial = mergeMode && existing && missingKeys.length > 0;
               
-              const singlePrompt = `
+                             const singlePrompt = `
 You are a professional translator specializing in software localization. Your task is to translate a JSON localization file to ${langName}.
 
 ${context ? `Application context: ${context}` : ''}
@@ -665,65 +665,141 @@ CRITICAL RULES - MUST FOLLOW:
 4. Keep all placeholders unchanged: {{variable}}, {0}, %s, %d, etc.
 5. Return ONLY valid JSON - no markdown, no explanations, no code blocks
 6. The output must have IDENTICAL keys to the input
+7. TRANSLATE ALL STRING VALUES - Do not leave any string untranslated
+8. If a string is already in ${langName}, translate it to a more natural form
+9. For technical terms, provide appropriate ${langName} translations
+
+TRANSLATION APPROACH:
+- Read the entire JSON structure carefully
+- Translate EVERY string value to ${langName}
+- Keep keys unchanged (left side of colon)
+- Translate values appropriately (right side of colon)
+- Preserve any special characters or formatting in values
+
+EXAMPLES:
+Input:  {"common": {"loading": "Loading..."}}
+Output: {"common": {"loading": "Cargando..."}}
+
+Input:  {"user": {"name": "Name", "email": "Email", "save": "Save"}}
+Output: {"user": {"name": "Nombre", "email": "Correo electrónico", "save": "Guardar"}}
+
+Input:  {"errors": {"required": "This field is required"}}
+Output: {"errors": {"required": "Este campo es obligatorio"}}
+
+NEVER DO THIS:
+✗ Change "loading" to "cargando" (key changed)
+✗ Change "user.name" to "userName" (key format changed)  
+✗ Leave any string values untranslated
+✗ Add or remove any keys
+✗ Reorder keys
+
+Remember: Every single string value must be translated to ${langName}. The JSON structure and all keys must remain identical.
 
 JSON to translate:
 ${contentForLang}`;
 
-              try {
-                const startTime = Date.now();
-                const apiResponse = await fetch('/api/translate', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    apiKey,
-                    model: actualModel,
-                    prompt: singlePrompt,
-                    isJson: true
-                  })
-                });
+                             // Retry logic for failed translations
+               const maxRetries = 2;
+               let lastError: Error | null = null;
+               
+               for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                 try {
+                   console.log(`[Translation] ${langName} - Attempt ${attempt}/${maxRetries}`);
+                   const startTime = Date.now();
+                   
+                   // Create AbortController for timeout handling
+                   const controller = new AbortController();
+                   const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+                   
+                   const apiResponse = await fetch('/api/translate', {
+                     method: 'POST',
+                     headers: {
+                       'Content-Type': 'application/json',
+                     },
+                     body: JSON.stringify({
+                       apiKey,
+                       model: actualModel,
+                       prompt: singlePrompt,
+                       isJson: true
+                     }),
+                     signal: controller.signal
+                   });
 
-                if (!apiResponse.ok) {
-                  const errorData = await apiResponse.json();
-                  throw new Error(errorData.error || `API call failed with status ${apiResponse.status}`);
-                }
+                   clearTimeout(timeoutId);
 
-                const data = await apiResponse.json();
-                const translatedText = data.text;
-                const duration = Date.now() - startTime;
-                
-                console.log(`[Translation] API call for ${langName} took ${duration}ms`);
-                
-                // Clean and merge if needed
-                const cleanedText = cleanResponse(translatedText, fileType);
-                let finalContent = cleanedText;
-                
-                if (mergeMode && existing && missingKeys.length > 0) {
-                  finalContent = mergeTranslations(existing, cleanedText, fileType);
-                }
-                
-                return {
-                  language: langName,
-                  languageCode: langCode,
-                  content: finalContent,
-                  audit: auditTranslation(contentToTranslate, finalContent, fileType)
-                } as TranslationResult;
-                
-              } catch (err) {
-                console.error(`[Translation] Error translating to ${langName}:`, err);
-                return {
-                  language: langName,
-                  languageCode: langCode,
-                  content: `Error: ${err instanceof Error ? err.message : 'Translation failed'}`,
-                  audit: {
-                    totalKeys: 0,
-                    translatedKeys: 0,
-                    untranslatedKeys: [`[ERROR] ${err instanceof Error ? err.message : 'Translation failed'}`],
-                    possiblyUntranslated: []
-                  }
-                } as TranslationResult;
-              }
+                   if (!apiResponse.ok) {
+                     const errorData = await apiResponse.json();
+                     throw new Error(errorData.error || `API call failed with status ${apiResponse.status}`);
+                   }
+
+                   const data = await apiResponse.json();
+                   const translatedText = data.text;
+                   const duration = Date.now() - startTime;
+                   
+                   console.log(`[Translation] API call for ${langName} took ${duration}ms`);
+                   
+                   // Validate response is not empty
+                   if (!translatedText || translatedText.trim().length === 0) {
+                     throw new Error('Empty response from translation API');
+                   }
+                   
+                   // Clean and merge if needed
+                   const cleanedText = cleanResponse(translatedText, fileType);
+                   
+                   // Additional validation for JSON
+                   if (fileType === 'json') {
+                     try {
+                       JSON.parse(cleanedText);
+                     } catch (parseErr) {
+                       throw new Error(`Invalid JSON response: ${parseErr instanceof Error ? parseErr.message : 'Parse failed'}`);
+                     }
+                   }
+                   
+                   let finalContent = cleanedText;
+                   
+                   if (mergeMode && existing && missingKeys.length > 0) {
+                     finalContent = mergeTranslations(existing, cleanedText, fileType);
+                   }
+                   
+                   return {
+                     language: langName,
+                     languageCode: langCode,
+                     content: finalContent,
+                     audit: auditTranslation(contentToTranslate, finalContent, fileType)
+                   } as TranslationResult;
+                   
+                 } catch (err) {
+                   lastError = err instanceof Error ? err : new Error('Translation failed');
+                   console.error(`[Translation] ${langName} - Attempt ${attempt} failed:`, lastError.message);
+                   
+                   // If this was an abort/timeout, don't retry
+                   if (lastError.name === 'AbortError' || lastError.message.includes('aborted')) {
+                     console.error(`[Translation] ${langName} - Request timed out, skipping retries`);
+                     break;
+                   }
+                   
+                   // Wait before retry (exponential backoff)
+                   if (attempt < maxRetries) {
+                     const waitTime = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s...
+                     console.log(`[Translation] ${langName} - Waiting ${waitTime}ms before retry...`);
+                     await new Promise(resolve => setTimeout(resolve, waitTime));
+                   }
+                 }
+               }
+               
+               // All retries failed
+               console.error(`[Translation] ${langName} - All ${maxRetries} attempts failed`);
+               return {
+                 language: langName,
+                 languageCode: langCode,
+                 content: `Error: ${lastError?.message || 'Translation failed after multiple attempts'}`,
+                 audit: {
+                   totalKeys: 0,
+                   translatedKeys: 0,
+                   untranslatedKeys: [`[ERROR] ${lastError?.message || 'Translation failed after multiple attempts'}`],
+                   possiblyUntranslated: []
+                 }
+               } as TranslationResult;
             }));
             
             allResults.push(...batchResults);
@@ -761,33 +837,83 @@ Make sure each translation maintains the exact same structure as the original.`;
           
           // For text and XML/Xcode, use bulk translation
           if (fileType === 'text' || fileType === 'xml' || fileType === 'xcode') {
-            const startTime = Date.now();
-            const apiResponse = await fetch('/api/translate', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                apiKey,
-                model: actualModel,
-                prompt: bulkPrompt,
-                isJson: false,
-                isBulk: true,
-                languages: languagesToTranslate
-              })
-            });
-
-            if (!apiResponse.ok) {
-              const errorData = await apiResponse.json();
-              throw new Error(errorData.error || `API call failed with status ${apiResponse.status}`);
-            }
-
-            const data = await apiResponse.json();
-            const bulkResponse = data.text;
-            const duration = Date.now() - startTime;
+            let bulkResponse = '';
+            let duration = 0;
             
-            console.log(`[Translation] Bulk API call took ${duration}ms`);
-            console.log(`[Translation] Bulk response length:`, bulkResponse.length);
+            // Retry logic for bulk translation
+            const maxRetries = 2;
+            let lastError: Error | null = null;
+            
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+              try {
+                console.log(`[Translation] Bulk translation - Attempt ${attempt}/${maxRetries} for ${languagesToTranslate.length} languages`);
+                const startTime = Date.now();
+                
+                // Create AbortController for timeout handling (longer timeout for bulk)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout for bulk
+                
+                const apiResponse = await fetch('/api/translate', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    apiKey,
+                    model: actualModel,
+                    prompt: bulkPrompt,
+                    isJson: false,
+                    isBulk: true,
+                    languages: languagesToTranslate
+                  }),
+                  signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!apiResponse.ok) {
+                  const errorData = await apiResponse.json();
+                  throw new Error(errorData.error || `API call failed with status ${apiResponse.status}`);
+                }
+
+                const data = await apiResponse.json();
+                bulkResponse = data.text;
+                duration = Date.now() - startTime;
+                
+                console.log(`[Translation] Bulk API call took ${duration}ms`);
+                console.log(`[Translation] Bulk response length:`, bulkResponse.length);
+                
+                // Validate response is not empty
+                if (!bulkResponse || bulkResponse.trim().length === 0) {
+                  throw new Error('Empty response from bulk translation API');
+                }
+                
+                // Success, break out of retry loop
+                break;
+                
+              } catch (err) {
+                lastError = err instanceof Error ? err : new Error('Bulk translation failed');
+                console.error(`[Translation] Bulk translation - Attempt ${attempt} failed:`, lastError.message);
+                
+                // If this was an abort/timeout, don't retry
+                if (lastError.name === 'AbortError' || lastError.message.includes('aborted')) {
+                  console.error(`[Translation] Bulk translation - Request timed out, skipping retries`);
+                  break;
+                }
+                
+                // Wait before retry (exponential backoff)
+                if (attempt < maxRetries) {
+                  const waitTime = Math.pow(2, attempt) * 2000; // 4s, 8s...
+                  console.log(`[Translation] Bulk translation - Waiting ${waitTime}ms before retry...`);
+                  await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+              }
+            }
+            
+            // If all retries failed, throw error to be handled by batch error logic
+            if (!bulkResponse && lastError) {
+              throw lastError;
+            }
             
             // Parse bulk response
             const translationRegex = /\[LANGUAGE:\s*([^\]]+)\]([\s\S]*?)\[END\]/g;
@@ -1452,15 +1578,25 @@ Make sure each translation maintains the exact same structure as the original.`;
         
         {isTranslating && translationProgress.total > 0 && (
           <div className={styles.progressContainer}>
+            <div className={styles.progressHeader}>
+              <span className={styles.progressText}>
+                {translationProgress.completed} / {translationProgress.total} languages completed
+              </span>
+              <span className={styles.progressPercent}>
+                {Math.round((translationProgress.completed / translationProgress.total) * 100)}%
+              </span>
+            </div>
             <div className={styles.progressBar}>
               <div 
                 className={styles.progressFill} 
                 style={{ width: `${(translationProgress.completed / translationProgress.total) * 100}%` }}
               />
             </div>
-            <span className={styles.progressText}>
-              {translationProgress.completed} / {translationProgress.total} languages completed
-            </span>
+            <div className={styles.progressDetails}>
+              <span className={styles.progressStatus}>
+                {currentTranslatingLang}
+              </span>
+            </div>
           </div>
         )}
       </div>
