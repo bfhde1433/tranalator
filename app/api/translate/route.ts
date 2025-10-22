@@ -23,7 +23,12 @@ export async function POST(request: NextRequest) {
     
     // Configure generation - temporarily disable structured output for JSON
     // as it's causing key changes
-    const generationConfig: any = {
+    const generationConfig: {
+      temperature: number;
+      topK: number;
+      topP: number;
+      maxOutputTokens: number;
+    } = {
       temperature: 0.7,
       topK: 40,
       topP: 0.95,
@@ -64,23 +69,25 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ text });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[API] Translation error:', error);
     
     let errorMessage = 'Translation failed';
     let statusCode = 500;
 
-    if (error.message?.includes('API key not valid')) {
-      errorMessage = 'Invalid API key. Please check your Gemini API key.';
-      statusCode = 401;
-    } else if (error.message?.includes('model not found')) {
-      errorMessage = 'Model not found. Please check the model name.';
-      statusCode = 404;
-    } else if (error.message?.includes('quota')) {
-      errorMessage = 'API quota exceeded. Please try again later.';
-      statusCode = 429;
-    } else if (error.message) {
-      errorMessage = error.message;
+    if (error instanceof Error) {
+      if (error.message.includes('API key not valid')) {
+        errorMessage = 'Invalid API key. Please check your Gemini API key.';
+        statusCode = 401;
+      } else if (error.message.includes('model not found')) {
+        errorMessage = 'Model not found. Please check the model name.';
+        statusCode = 404;
+      } else if (error.message.includes('quota')) {
+        errorMessage = 'API quota exceeded. Please try again later.';
+        statusCode = 429;
+      } else {
+        errorMessage = error.message;
+      }
     }
 
     return NextResponse.json(
@@ -88,4 +95,4 @@ export async function POST(request: NextRequest) {
       { status: statusCode }
     );
   }
-} 
+}

@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@babel/generator": "^7.28.3",
+    "@babel/parser": "^7.28.4",
+    "@babel/types": "^7.28.4",
     "@google/generative-ai": "^0.24.1",
     "next": "15.3.3",
     "react": "^19.0.0",

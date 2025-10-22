@@ -2,9 +2,22 @@
 
 import { useState, useEffect } from 'react';
 import styles from './page.module.css';
-import { POPULAR_LANGUAGES, Language, getLanguageByCode, getLanguageName } from './languages';
+import { POPULAR_LANGUAGES, getLanguageByCode, getLanguageName } from './languages';
+import { parseReactTranslationFile, generateReactTranslationFile, ReactTranslationFileInfo } from './reactTranslationUtils';
 
-type FileType = 'xml' | 'json' | 'xcode' | 'text';
+type FileType = 'xml' | 'json' | 'xcode' | 'text' | 'react';
+
+type JsonObject = Record<string, unknown>;
+type StoredTranslation = JsonObject | string;
+
+type FileSystemEntry = {
+  isFile: boolean;
+  isDirectory: boolean;
+  file: (callback: (file: File) => void) => void;
+  createReader: () => {
+    readEntries: (callback: (entries: FileSystemEntry[]) => void) => void;
+  };
+};
 
 interface AuditResult {
   totalKeys: number;
@@ -35,9 +48,12 @@ export default function Home() {
   const [modelName, setModelName] = useState('gemini-1.5-flash');
   const [customModel, setCustomModel] = useState('');
   const [translationProgress, setTranslationProgress] = useState({ completed: 0, total: 0 });
-  const [existingTranslations, setExistingTranslations] = useState<Map<string, any>>(new Map());
+  const [existingTranslations, setExistingTranslations] = useState<Map<string, StoredTranslation>>(new Map());
   const [mergeMode, setMergeMode] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [reactFileInfo, setReactFileInfo] = useState<ReactTranslationFileInfo | null>(null);
+  const [existingReactInfos, setExistingReactInfos] = useState<Map<string, ReactTranslationFileInfo>>(new Map());
+  const [sourceFileExtension, setSourceFileExtension] = useState<string>('json');
 
   // Load saved languages and model on mount
   useEffect(() => {
@@ -99,22 +115,57 @@ export default function Home() {
 
     console.log('[FileUpload] Uploading file:', file.name, 'Type:', file.type, 'Size:', file.size);
     const text = await file.text();
-    setFileContent(text);
-    setError('');
-    setTranslations([]);
-    console.log('[FileUpload] File content loaded, length:', text.length);
+    const detectedType = detectFileType(text, file.name);
+    const extension = file.name.includes('.') ? file.name.split('.').pop()!.toLowerCase() : '';
+
+    if (detectedType !== fileType) {
+      setFileType(detectedType);
+    }
+
+    try {
+      if (detectedType === 'react') {
+        const parsed = parseReactTranslationFile(text);
+        setReactFileInfo({ ...parsed.info, originalCode: text });
+        setFileContent(JSON.stringify(parsed.data, null, 2));
+      } else {
+        setReactFileInfo(null);
+        setFileContent(text);
+      }
+
+      setExistingReactInfos(new Map());
+      const fallbackExtension =
+        detectedType === 'react'
+          ? 'ts'
+          : detectedType === 'json'
+          ? 'json'
+          : detectedType === 'xml'
+          ? 'xml'
+          : detectedType === 'xcode'
+          ? 'strings'
+          : 'txt';
+      setSourceFileExtension(extension || fallbackExtension);
+      setError('');
+      setTranslations([]);
+      console.log('[FileUpload] File content loaded, length:', text.length, 'Detected type:', detectedType);
+    } catch (err) {
+      console.error('[FileUpload] Failed to process file:', err);
+      setError('Failed to process the uploaded file. Please ensure it is a valid translation file.');
+      setFileContent('');
+      setReactFileInfo(null);
+    }
   };
 
   const processTranslationFiles = async (files: FileList | File[]) => {
     console.log('[ExistingTranslations] Processing', files.length, 'files');
-    const translationsMap = new Map<string, any>();
+    const translationsMap = new Map<string, StoredTranslation>();
+    const reactInfoMap = new Map<string, ReactTranslationFileInfo>();
     let processedCount = 0;
 
     for (const file of Array.from(files)) {
       try {
         // Skip non-translation files
         const fileName = file.name.toLowerCase();
-        const validExtensions = ['.json', '.xml', '.strings'];
+        const validExtensions = ['.json', '.xml', '.strings', '.js', '.ts', '.jsx', '.tsx', '.mjs', '.cjs'];
         const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
         
         if (!hasValidExtension) {
@@ -123,45 +174,55 @@ export default function Home() {
         }
 
         const text = await file.text();
+        const detectedType = detectFileType(text, file.name);
         
         // Extract language code from filename
         let languageCode = '';
-        const baseName = file.name.split('.')[0];
-        
-        // Handle common patterns
-        if (baseName.includes('_')) {
-          // translated_es.xml, Localizable_es.strings
-          languageCode = baseName.split('_').pop() || '';
-        } else if (baseName.includes('-')) {
-          // zh-TW.json, en-US.json
-          languageCode = baseName;
+        const languageMatch = file.name.match(/([A-Za-z]{2,3}(?:[-_\.][A-Za-z0-9]{2,4})?)\.[^.]+$/);
+        if (languageMatch) {
+          languageCode = languageMatch[1].replace(/_/g, '-').split('.').pop() || '';
         } else {
-          // es.json, fr.json
-          languageCode = baseName;
+          const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+          const fallbackMatch = nameWithoutExt.match(/([A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,4})?)$/);
+          if (fallbackMatch) {
+            languageCode = fallbackMatch[1].replace(/_/g, '-');
+          } else {
+            languageCode = nameWithoutExt;
+          }
         }
 
-        // Validate language code (should be 2-5 characters)
-        if (!languageCode || languageCode.length < 2 || languageCode.length > 5) {
+        languageCode = languageCode.trim();
+
+        // Validate language code (should be 2-8 characters)
+        if (!languageCode || languageCode.length < 2 || languageCode.length > 8) {
           console.warn('[ExistingTranslations] Could not extract valid language code from', file.name);
           continue;
         }
 
         // Parse the file content based on detected type
-        let parsedContent: any = null;
-        
-        if (fileName.endsWith('.json')) {
+        let parsedContent: StoredTranslation | null = null;
+        if (detectedType === 'json') {
           try {
             parsedContent = JSON.parse(text);
           } catch (err) {
             console.error('[ExistingTranslations] Failed to parse JSON file', file.name, err);
             continue;
           }
-        } else if (fileName.endsWith('.xml')) {
+        } else if (detectedType === 'xml') {
           // For XML, store raw content
           parsedContent = text;
-        } else if (fileName.endsWith('.strings')) {
+        } else if (detectedType === 'xcode') {
           // For Xcode strings, store raw content
           parsedContent = text;
+        } else if (detectedType === 'react') {
+          try {
+            const parsed = parseReactTranslationFile(text);
+            parsedContent = parsed.data;
+            reactInfoMap.set(languageCode, { ...parsed.info, originalCode: text });
+          } catch (err) {
+            console.error('[ExistingTranslations] Failed to parse React translation file', file.name, err);
+            continue;
+          }
         }
 
         if (parsedContent) {
@@ -176,6 +237,7 @@ export default function Home() {
 
     if (processedCount > 0) {
       setExistingTranslations(translationsMap);
+      setExistingReactInfos(reactInfoMap);
       setMergeMode(true);
       
       console.log('[ExistingTranslations] Successfully loaded', processedCount, 'translations for languages:', Array.from(translationsMap.keys()));
@@ -221,7 +283,9 @@ export default function Home() {
     // Process all dropped items (files and folders)
     for (const item of items) {
       if (item.kind === 'file') {
-        const entry = item.webkitGetAsEntry();
+        const entry = (item as DataTransferItem & {
+          webkitGetAsEntry?: () => FileSystemEntry | null;
+        }).webkitGetAsEntry?.();
         if (entry) {
           await processEntry(entry, files);
         }
@@ -238,7 +302,7 @@ export default function Home() {
     }
   };
 
-  const processEntry = async (entry: any, files: File[]): Promise<void> => {
+  const processEntry = async (entry: FileSystemEntry, files: File[]): Promise<void> => {
     return new Promise((resolve) => {
       if (entry.isFile) {
         entry.file((file: File) => {
@@ -247,7 +311,7 @@ export default function Home() {
         });
       } else if (entry.isDirectory) {
         const dirReader = entry.createReader();
-        dirReader.readEntries(async (entries: any[]) => {
+        dirReader.readEntries(async (entries: FileSystemEntry[]) => {
           for (const childEntry of entries) {
             await processEntry(childEntry, files);
           }
@@ -259,12 +323,39 @@ export default function Home() {
     });
   };
 
-  const detectFileType = (content: string): FileType => {
-    if (content.trim().startsWith('<?xml') || content.includes('<string name=')) {
-      return 'xml';
-    } else if (content.includes('/* Localizable.strings') || content.includes('" = "')) {
+  const detectFileType = (content: string, fileName?: string): FileType => {
+    const trimmed = content.trim();
+    const name = fileName?.toLowerCase() || '';
+
+    if (name.endsWith('.strings') || trimmed.includes('/* Localizable.strings')) {
       return 'xcode';
     }
+
+    if (name.endsWith('.xml') || trimmed.startsWith('<?xml') || trimmed.includes('<string name=')) {
+      return 'xml';
+    }
+
+    if (
+      name.endsWith('.ts') ||
+      name.endsWith('.tsx') ||
+      name.endsWith('.js') ||
+      name.endsWith('.jsx') ||
+      name.endsWith('.mjs') ||
+      name.endsWith('.cjs')
+    ) {
+      return 'react';
+    }
+
+    if (
+      trimmed.startsWith('export default') ||
+      trimmed.startsWith('module.exports') ||
+      trimmed.includes('export const') ||
+      trimmed.includes('as const') ||
+      trimmed.includes('satisfies')
+    ) {
+      return 'react';
+    }
+
     return 'json';
   };
 
@@ -281,7 +372,7 @@ export default function Home() {
   const cleanResponse = (text: string, type: FileType): string => {
     let cleaned = text.trim();
     
-    if (type === 'json') {
+    if (type === 'json' || type === 'react') {
       // Remove any markdown code blocks
       if (cleaned.startsWith('```json')) {
         cleaned = cleaned.substring(7);
@@ -344,23 +435,24 @@ export default function Home() {
     }
 
     try {
-      if (type === 'json') {
+      if (type === 'json' || type === 'react') {
         const cleanTranslated = cleanResponse(translated, 'json');
         
         console.log('[Audit] Parsing JSON content');
         console.log('[Audit] First 200 chars of cleaned translated:', cleanTranslated.substring(0, 200));
         
-        let originalJson, translatedJson;
+        let originalJson: JsonObject | undefined;
+        let translatedJson: JsonObject | undefined;
         
         try {
-          originalJson = JSON.parse(original);
+          originalJson = JSON.parse(original) as JsonObject;
         } catch (e) {
           console.error('[Audit] Failed to parse original JSON:', e);
           return result;
         }
         
         try {
-          translatedJson = JSON.parse(cleanTranslated);
+          translatedJson = JSON.parse(cleanTranslated) as JsonObject;
         } catch (e) {
           console.error('[Audit] Failed to parse translated JSON after cleaning:', e);
           // Try one more time with more aggressive cleaning
@@ -374,10 +466,10 @@ export default function Home() {
           }
           
           try {
-            translatedJson = JSON.parse(aggressivelyCleaned);
+            translatedJson = JSON.parse(aggressivelyCleaned) as JsonObject;
             console.log('[Audit] Successfully parsed after aggressive cleaning');
-          } catch (e2) {
-            console.error('[Audit] Failed to parse even after aggressive cleaning');
+          } catch (errorAfterCleaning) {
+            console.error('[Audit] Failed to parse even after aggressive cleaning:', errorAfterCleaning);
             // Return partial audit result indicating parse failure
             result.totalKeys = Object.keys(originalJson).length;
             result.untranslatedKeys = ['[JSON Parse Error]'];
@@ -386,6 +478,10 @@ export default function Home() {
         }
         
         // First check if the keys match at the top level
+        if (!originalJson || !translatedJson) {
+          return result;
+        }
+
         const origKeys = Object.keys(originalJson).sort();
         const transKeys = Object.keys(translatedJson).sort();
         
@@ -410,22 +506,31 @@ export default function Home() {
           }
         }
         
-        const checkKeys = (origObj: any, transObj: any, path: string = '') => {
-          for (const key in origObj) {
+        const checkKeys = (
+          origObj: JsonObject,
+          transObj: JsonObject | undefined,
+          path: string = ''
+        ) => {
+          for (const [key, value] of Object.entries(origObj)) {
             const currentPath = path ? `${path}.${key}` : key;
-            
-            if (typeof origObj[key] === 'object' && origObj[key] !== null) {
-              if (!transObj || !transObj[key] || typeof transObj[key] !== 'object') {
+            const translatedValue = transObj ? (transObj as JsonObject)[key] : undefined;
+
+            if (isPlainObject(value)) {
+              if (!isPlainObject(translatedValue)) {
                 result.untranslatedKeys.push(currentPath);
               } else {
-                checkKeys(origObj[key], transObj[key], currentPath);
+                checkKeys(value as JsonObject, translatedValue as JsonObject, currentPath);
               }
-            } else if (typeof origObj[key] === 'string') {
+            } else if (typeof value === 'string') {
               result.totalKeys++;
-              
-              if (!transObj || !transObj[key]) {
+
+              if (
+                translatedValue === undefined ||
+                translatedValue === null ||
+                translatedValue === ''
+              ) {
                 result.untranslatedKeys.push(currentPath);
-              } else if (transObj[key] === origObj[key]) {
+              } else if (translatedValue === value) {
                 result.possiblyUntranslated.push(currentPath);
               } else {
                 result.translatedKeys++;
@@ -572,14 +677,8 @@ export default function Home() {
         setCurrentTranslatingLang(`Batch ${batchNumber}/${languageBatches.length} - ${languageBatch.length} languages`);
         
         try {
-          // Prepare data for bulk translation
-          const languageInfos = languageBatch.map(code => ({
-            code,
-            name: getLanguageName(code)
-          }));
-          
           // Check for existing translations and prepare content
-          const preparedContents = new Map<string, { content: string; missingKeys: string[]; existing?: any }>();
+          const preparedContents = new Map<string, { content: string; missingKeys: string[]; existing?: StoredTranslation }>();
           
           for (const langCode of languageBatch) {
             const existingTranslation = existingTranslations.get(langCode);
@@ -592,11 +691,33 @@ export default function Home() {
               if (missingKeys.length === 0) {
                 // No missing keys, use existing translation
                 const langName = getLanguageName(langCode);
+                let contentOutput: string;
+                let auditSource: string | undefined;
+
+                if (fileType === 'json') {
+                  auditSource = JSON.stringify(existingTranslation, null, 2);
+                  contentOutput = auditSource;
+                } else if (fileType === 'react') {
+                  const jsonString = JSON.stringify(existingTranslation, null, 2);
+                  auditSource = jsonString;
+                  contentOutput = buildReactTranslationContent(existingTranslation, langCode, jsonString);
+                } else {
+                  contentOutput = existingTranslation;
+                  auditSource = existingTranslation;
+                }
+
                 allResults.push({
                   language: langName,
                   languageCode: langCode,
-                  content: fileType === 'json' ? JSON.stringify(existingTranslation, null, 2) : existingTranslation,
-                  audit: fileType !== 'text' ? auditTranslation(contentToTranslate, fileType === 'json' ? JSON.stringify(existingTranslation, null, 2) : existingTranslation, fileType) : undefined
+                  content: contentOutput,
+                  audit:
+                    fileType !== 'text'
+                      ? auditTranslation(
+                          contentToTranslate,
+                          auditSource || '',
+                          fileType === 'react' ? 'react' : fileType
+                        )
+                      : undefined
                 });
                 continue;
               }
@@ -644,8 +765,8 @@ Texte traduit en français
 [END]
 
 Make sure each translation sounds natural in its respective language.`;
-          } else if (fileType === 'json') {
-            // For JSON, we need to be more careful about bulk translation
+          } else if (fileType === 'json' || fileType === 'react') {
+            // For JSON-based structures (including React modules), translate individually to maintain structure
             // We'll translate one at a time within the batch to maintain structure integrity
             const batchResults = await Promise.all(languagesToTranslate.map(async (langCode) => {
               const { content: contentForLang, missingKeys, existing } = preparedContents.get(langCode)!;
@@ -745,27 +866,48 @@ ${contentForLang}`;
                    
                    // Clean and merge if needed
                    const cleanedText = cleanResponse(translatedText, fileType);
-                   
-                   // Additional validation for JSON
-                   if (fileType === 'json') {
+
+                   let jsonData: JsonObject | null = null;
+                   let finalContent = cleanedText;
+
+                   if (fileType === 'json' || fileType === 'react') {
                      try {
-                       JSON.parse(cleanedText);
+                       jsonData = JSON.parse(cleanedText);
+                       finalContent = JSON.stringify(jsonData, null, 2);
                      } catch (parseErr) {
                        throw new Error(`Invalid JSON response: ${parseErr instanceof Error ? parseErr.message : 'Parse failed'}`);
                      }
                    }
-                   
-                   let finalContent = cleanedText;
-                   
+
                    if (mergeMode && existing && missingKeys.length > 0) {
                      finalContent = mergeTranslations(existing, cleanedText, fileType);
+                     if (fileType === 'json' || fileType === 'react') {
+                       try {
+                         jsonData = JSON.parse(finalContent);
+                       } catch (parseErr) {
+                         throw new Error(`Merged content is invalid JSON: ${parseErr instanceof Error ? parseErr.message : 'Parse failed'}`);
+                       }
+                     }
                    }
-                   
+
+                   let outputContent = finalContent;
+                   if (fileType === 'react') {
+                     outputContent = buildReactTranslationContent(
+                       jsonData ?? undefined,
+                       langCode,
+                       finalContent
+                     );
+                   }
+
                    return {
                      language: langName,
                      languageCode: langCode,
-                     content: finalContent,
-                     audit: auditTranslation(contentToTranslate, finalContent, fileType)
+                     content: outputContent,
+                     audit: auditTranslation(
+                       contentToTranslate,
+                       finalContent,
+                       fileType === 'react' ? 'react' : fileType
+                     )
                    } as TranslationResult;
                    
                  } catch (err) {
@@ -1009,15 +1151,14 @@ Make sure each translation maintains the exact same structure as the original.`;
       const successCount = allResults.filter(r => !r.content.startsWith('Error:')).length;
       console.log(`[Translation] Successfully translated to ${successCount}/${allResults.length} languages`);
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = 'Translation failed';
       
       console.error('[Translation] Error occurred:', err);
-      console.error('[Translation] Error name:', err.name);
-      console.error('[Translation] Error message:', err.message);
-      console.error('[Translation] Error stack:', err.stack);
-      
       if (err instanceof Error) {
+        console.error('[Translation] Error name:', err.name);
+        console.error('[Translation] Error message:', err.message);
+        console.error('[Translation] Error stack:', err.stack);
         if (err.message.includes('NetworkError')) {
           errorMessage = `Network error: Unable to connect to the translation service. Please check your internet connection.`;
         } else if (err.message.includes('Invalid API key')) {
@@ -1029,6 +1170,8 @@ Make sure each translation maintains the exact same structure as the original.`;
         } else {
           errorMessage = err.message;
         }
+      } else {
+        console.error('[Translation] Error details unavailable for non-Error type');
       }
       
       setError(errorMessage);
@@ -1044,10 +1187,14 @@ Make sure each translation maintains the exact same structure as the original.`;
     const a = document.createElement('a');
     a.href = url;
     
-    const extension = fileType === 'xml' ? 'xml' : fileType === 'xcode' ? 'strings' : fileType === 'text' ? 'txt' : 'json';
+    let extension = 'json';
+    if (fileType === 'xml') extension = 'xml';
+    else if (fileType === 'xcode') extension = 'strings';
+    else if (fileType === 'text') extension = 'txt';
+    else if (fileType === 'react') extension = sourceFileExtension || 'ts';
     
-    // Use language code for JSON files, full language name for others
-    const filename = fileType === 'json' 
+    // Use language code for JSON-like files, full language name for others
+    const filename = fileType === 'json' || fileType === 'react'
       ? `${translation.languageCode}.${extension}`
       : `translated_${translation.languageCode}.${extension}`;
     
@@ -1068,42 +1215,59 @@ Make sure each translation maintains the exact same structure as the original.`;
     }
   };
 
-  const findMissingKeys = (originalContent: string, existingTranslation: any, fileType: FileType): string[] => {
+  const findMissingKeys = (
+    originalContent: string,
+    existingTranslation: StoredTranslation | undefined,
+    fileType: FileType
+  ): string[] => {
     const missingKeys: string[] = [];
 
     try {
-      if (fileType === 'json') {
+      if (fileType === 'json' || fileType === 'react') {
         const originalJson = JSON.parse(originalContent);
-        
-        const checkMissingKeys = (origObj: any, transObj: any, path: string = '') => {
-          for (const key in origObj) {
+        if (!existingTranslation || typeof existingTranslation !== 'object') {
+          return missingKeys;
+        }
+        const translationJson = existingTranslation as JsonObject;
+
+        const checkMissingKeys = (
+          origObj: JsonObject,
+          transObj: JsonObject | undefined,
+          path: string = ''
+        ) => {
+          for (const [key, value] of Object.entries(origObj)) {
             const currentPath = path ? `${path}.${key}` : key;
-            
-            if (typeof origObj[key] === 'object' && origObj[key] !== null) {
-              if (!transObj || !transObj[key] || typeof transObj[key] !== 'object') {
+            const translatedValue = transObj ? (transObj as JsonObject)[key] : undefined;
+
+            if (isPlainObject(value)) {
+              if (!isPlainObject(translatedValue)) {
                 missingKeys.push(currentPath);
               } else {
-                checkMissingKeys(origObj[key], transObj[key], currentPath);
+                checkMissingKeys(value as JsonObject, translatedValue as JsonObject, currentPath);
               }
-            } else if (typeof origObj[key] === 'string') {
-              if (!transObj || !transObj[key] || transObj[key] === origObj[key]) {
+            } else if (typeof value === 'string') {
+              if (
+                translatedValue === undefined ||
+                translatedValue === null ||
+                translatedValue === value
+              ) {
                 missingKeys.push(currentPath);
               }
             }
           }
         };
         
-        checkMissingKeys(originalJson, existingTranslation);
+        checkMissingKeys(originalJson, translationJson);
       } else if (fileType === 'xml') {
         // Extract string entries from original XML
         const originalStrings = new Map<string, string>();
         const xmlRegex = /<string\s+name="([^"]+)">([^<]*)<\/string>/g;
         let match;
-        
+
         while ((match = xmlRegex.exec(originalContent)) !== null) {
           originalStrings.set(match[1], match[2]);
         }
-        
+
         // Extract existing translations
         const existingStrings = new Map<string, string>();
         if (typeof existingTranslation === 'string') {
@@ -1124,11 +1288,11 @@ Make sure each translation maintains the exact same structure as the original.`;
         const originalStrings = new Map<string, string>();
         const stringsRegex = /"([^"]+)"\s*=\s*"([^"]*)"/g;
         let match;
-        
+
         while ((match = stringsRegex.exec(originalContent)) !== null) {
           originalStrings.set(match[1], match[2]);
         }
-        
+
         // Extract existing translations
         const existingStrings = new Map<string, string>();
         if (typeof existingTranslation === 'string') {
@@ -1153,16 +1317,16 @@ Make sure each translation maintains the exact same structure as the original.`;
   };
 
   const createPartialContentForTranslation = (originalContent: string, missingKeys: string[], fileType: FileType): string => {
-    if (fileType === 'json') {
+    if (fileType === 'json' || fileType === 'react') {
       try {
-        const originalJson = JSON.parse(originalContent);
-        const partialJson: any = {};
+        const originalJson = JSON.parse(originalContent) as JsonObject;
+        const partialJson: JsonObject = {};
         
         // Build partial JSON with only missing keys
         for (const keyPath of missingKeys) {
           const keys = keyPath.split('.');
-          let current = partialJson;
-          let originalCurrent = originalJson;
+          let current: JsonObject = partialJson;
+          let originalCurrent: JsonObject = originalJson;
           
           for (let i = 0; i < keys.length; i++) {
             const key = keys[i];
@@ -1172,11 +1336,14 @@ Make sure each translation maintains the exact same structure as the original.`;
               current[key] = originalCurrent[key];
             } else {
               // Intermediate key, create object if needed
-              if (!current[key]) {
+              if (!isPlainObject(current[key])) {
                 current[key] = {};
               }
-              current = current[key];
-              originalCurrent = originalCurrent[key];
+              current = current[key] as JsonObject;
+              const nextOriginal = originalCurrent[key];
+              originalCurrent = isPlainObject(nextOriginal)
+                ? (nextOriginal as JsonObject)
+                : ({} as JsonObject);
             }
           }
         }
@@ -1220,27 +1387,37 @@ Make sure each translation maintains the exact same structure as the original.`;
     return originalContent;
   };
 
-  const mergeTranslations = (originalTranslation: any, newTranslation: string, fileType: FileType): string => {
+  const isPlainObject = (value: unknown): value is JsonObject => {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+  };
+
+  const mergeTranslations = (
+    originalTranslation: StoredTranslation,
+    newTranslation: string,
+    fileType: FileType
+  ): string => {
     try {
-      if (fileType === 'json') {
-        const newJson = JSON.parse(cleanResponse(newTranslation, fileType));
-        
-        // Deep merge function
-        const deepMerge = (target: any, source: any): any => {
-          const result = { ...target };
+      if (fileType === 'json' || fileType === 'react') {
+        if (typeof originalTranslation !== 'object' || originalTranslation === null) {
+          return cleanResponse(newTranslation, 'json');
+        }
+        const newJson = JSON.parse(cleanResponse(newTranslation, 'json'));
+        const deepMerge = (target: JsonObject, source: JsonObject): JsonObject => {
+          const result: JsonObject = { ...target };
           
-          for (const key in source) {
-            if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-              result[key] = deepMerge(result[key] || {}, source[key]);
+          for (const [key, value] of Object.entries(source)) {
+            const existingValue = result[key];
+            if (isPlainObject(value) && isPlainObject(existingValue)) {
+              result[key] = deepMerge(existingValue as JsonObject, value as JsonObject);
             } else {
-              result[key] = source[key];
+              result[key] = value;
             }
           }
           
           return result;
         };
         
-        const merged = deepMerge(originalTranslation, newJson);
+        const merged = deepMerge(originalTranslation as JsonObject, newJson);
         return JSON.stringify(merged, null, 2);
       } else if (fileType === 'xml') {
         // Parse existing XML strings
@@ -1315,6 +1492,32 @@ Make sure each translation maintains the exact same structure as the original.`;
     return newTranslation;
   };
 
+  const buildReactTranslationContent = (
+    data: JsonObject | string | undefined,
+    langCode: string,
+    fallbackJson?: string
+  ): string => {
+    const info = existingReactInfos.get(langCode) ?? reactFileInfo;
+    const jsonText =
+      fallbackJson ??
+      (typeof data === 'string' ? data : JSON.stringify(data, null, 2));
+
+    if (!info) {
+      return `export default ${jsonText};\n`;
+    }
+
+    try {
+      const objectData: JsonObject =
+        typeof data === 'string'
+          ? (JSON.parse(data) as JsonObject)
+          : ((data ?? {}) as JsonObject);
+      return generateReactTranslationFile(objectData as Record<string, unknown>, info);
+    } catch (err) {
+      console.error(`[ReactFormat] Failed to generate React translation for ${langCode}:`, err);
+      return `export default ${jsonText};\n`;
+    }
+  };
+
   return (
     <main className={styles.main}>
       <h1 className={styles.title}>String Asset Translator</h1>
@@ -1383,15 +1586,22 @@ Make sure each translation maintains the exact same structure as the original.`;
           <select
             value={fileType}
             onChange={(e) => {
-              setFileType(e.target.value as FileType);
+              const newType = e.target.value as FileType;
+              setFileType(newType);
               setFileContent('');
               setTextContent('');
               setTranslations([]);
+              setReactFileInfo(null);
+              setExistingReactInfos(new Map());
+              if (newType !== 'text') {
+                setSourceFileExtension(newType === 'react' ? 'ts' : newType === 'xml' ? 'xml' : newType === 'xcode' ? 'strings' : 'json');
+              }
             }}
             className={styles.select}
           >
             <option value="text">Text (Direct Translation)</option>
             <option value="json">JSON (Next.js locales)</option>
+            <option value="react">React (JS/TS modules)</option>
             <option value="xml">XML (Android strings.xml)</option>
             <option value="xcode">Xcode Strings</option>
           </select>
@@ -1419,9 +1629,15 @@ Make sure each translation maintains the exact same structure as the original.`;
               <input
                 type="file"
                 onChange={handleFileUpload}
-                accept=".json,.xml,.strings"
+                accept=".json,.xml,.strings,.ts,.tsx,.js,.jsx,.cjs,.mjs"
                 className={styles.fileInput}
               />
+              {fileType === 'react' && (
+                <span className={styles.hint}>
+                  Supports modules that export a localization object (for example, export default &#123; ... &#125;).
+                  TypeScript annotations such as <code>as const</code> are preserved in the output.
+                </span>
+              )}
             </label>
           </div>
 
@@ -1444,7 +1660,7 @@ Make sure each translation maintains the exact same structure as the original.`;
                   or individual translation files
                 </div>
                 <div className={styles.dropZoneSubtext}>
-                  Supports: .json, .xml, .strings files
+                  Supports: .json, .xml, .strings, .ts, .js, .tsx files
                   <br />
                   Files should be named with language codes (es.json, fr.xml, etc.)
                 </div>
@@ -1452,11 +1668,11 @@ Make sure each translation maintains the exact same structure as the original.`;
                 <input
                   type="file"
                   onChange={handleExistingTranslationsUpload}
-                  accept=".json,.xml,.strings"
+                  accept=".json,.xml,.strings,.ts,.tsx,.js,.jsx,.cjs,.mjs"
                   multiple
                   className={styles.fileInput}
                   id="existing-translations-input"
-                  {...({ webkitdirectory: "" } as any)}
+                  {...({ webkitdirectory: "" } as { webkitdirectory: string })}
                 />
                 <label htmlFor="existing-translations-input" className={styles.browseButton}>
                   Browse Files/Folder
@@ -1477,7 +1693,10 @@ Make sure each translation maintains the exact same structure as the original.`;
                           onClick={() => {
                             const newMap = new Map(existingTranslations);
                             newMap.delete(code);
+                            const newReactMap = new Map(existingReactInfos);
+                            newReactMap.delete(code);
                             setExistingTranslations(newMap);
+                            setExistingReactInfos(newReactMap);
                             if (newMap.size === 0) {
                               setMergeMode(false);
                             }
@@ -1494,6 +1713,7 @@ Make sure each translation maintains the exact same structure as the original.`;
                 <button
                   onClick={() => {
                     setExistingTranslations(new Map());
+                    setExistingReactInfos(new Map());
                     setMergeMode(false);
                   }}
                   className={styles.clearButton}

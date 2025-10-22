@@ -4,7 +4,7 @@ A Next.js application that uses Google's Gemini AI to translate localization fil
 
 ## Features
 
-- **Multiple File Format Support**: JSON, Android XML, Xcode strings, and plain text
+- **Multiple File Format Support**: JSON, React JS/TS modules, Android XML, Xcode strings, and plain text
 - **Language Tags Selection**: Choose from 70+ popular languages with an easy-to-use tag interface
 - **Parallel Translation**: Translate to multiple languages simultaneously with configurable concurrency
 - **Smart Merge Mode**: Upload existing translations and only translate missing keys
@@ -45,7 +45,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 1. **Enter your Gemini API Key**: Required for translation services
 2. **Select AI Model**: Choose from Gemini Flash (recommended), Pro, or enter a custom model
 3. **Set Concurrent Translations**: Adjust the slider (1-20) to control parallel processing
-4. **Choose Translation Mode**: JSON, XML, Xcode, or Text
+4. **Choose Translation Mode**: JSON, React module, XML, Xcode, or Text
 5. **Upload Main File**: Your source localization file
 6. **Select Target Languages**: Click on language tags to select/deselect languages
 7. **Add Context** (optional): Describe your app for better translations
@@ -61,6 +61,7 @@ For the most efficient workflow when you have existing translations:
    - **Browse**: Click "Browse Files/Folder" to select multiple files or a folder
    - **Auto-Detection**: The app automatically detects language codes from filenames
    - **Bulk Upload**: Upload dozens of translation files at once
+   - **React Modules**: Works with JS/TS locale files that export objects (e.g. `export default { ... }`)
 3. **Auto-Selection**: Languages with existing translations are automatically selected
 4. **Smart Translation**: Only missing or untranslated keys are sent to the AI
 5. **Merged Results**: Get complete translation files with existing + new translations
@@ -85,6 +86,7 @@ The app automatically detects language codes from filenames:
 - `es.json`, `fr.json`, `de.json` → `es`, `fr`, `de`
 - `translated_es.xml`, `translated_fr.xml` → `es`, `fr`
 - `Localizable_es.strings` → `es`
+- `common.en.ts`, `fr.ts`, `messages-pt_BR.ts` → `en`, `fr`, `pt-BR`
 - `zh-TW.json`, `en-US.json` → `zh-TW`, `en-US` (supports region codes)
 
 Downloaded files use the same language code format for easy integration.
